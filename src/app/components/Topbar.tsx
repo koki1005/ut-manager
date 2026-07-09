@@ -11,7 +11,10 @@ export default function Topbar({
 }) {
   return (
     <header className="flex items-center justify-between border-b border-border bg-background px-6 py-3">
-      <h1 className="text-sm font-semibold">{title}</h1>
+      <h1 className="flex items-center gap-2 text-sm font-semibold">
+        <span className="inline-block h-4 w-1 bg-accent" aria-hidden />
+        {title}
+      </h1>
       <nav className="flex items-center gap-2 text-sm">
         <Link
           href={switchHref}

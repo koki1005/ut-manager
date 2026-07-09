@@ -15,15 +15,17 @@ export default function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-60 shrink-0 border-r border-border bg-surface md:block">
+    <aside className="hidden w-60 shrink-0 bg-sidebar-bg text-sidebar-fg md:block">
       <Link
         href="/"
-        className="flex items-center gap-2 border-b-2 border-accent px-4 py-3.5"
+        className="flex items-center gap-2 border-b border-white/15 px-4 py-3.5"
       >
-        <span className="inline-block h-5 w-1.5 bg-accent" aria-hidden />
+        <span className="inline-block h-5 w-1.5 bg-white" aria-hidden />
         <span className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold">UT Manager</span>
-          <span className="text-xs text-muted">{role}</span>
+          <span className="text-sm font-semibold text-sidebar-fg-strong">
+            UT Manager
+          </span>
+          <span className="text-xs text-sidebar-fg/70">{role}</span>
         </span>
       </Link>
 
@@ -36,10 +38,10 @@ export default function Sidebar({
             return (
               <span
                 key={it.href}
-                className="flex items-center justify-between border-l-2 border-transparent px-3 py-2 text-sm text-muted/60"
+                className="flex items-center justify-between border-l-2 border-transparent px-3 py-2 text-sm text-sidebar-fg/40"
               >
                 {it.label}
-                <span className="border border-border px-1 text-[10px]">近日</span>
+                <span className="border border-white/20 px-1 text-[10px]">近日</span>
               </span>
             );
           }
@@ -49,8 +51,8 @@ export default function Sidebar({
               href={it.href}
               className={`block border-l-2 px-3 py-2 text-sm transition-colors ${
                 active
-                  ? "border-accent bg-accent/10 font-medium text-accent"
-                  : "border-transparent text-foreground hover:bg-background"
+                  ? "border-white bg-white/15 font-medium text-sidebar-fg-strong"
+                  : "border-transparent hover:bg-white/10 hover:text-sidebar-fg-strong"
               }`}
             >
               {it.label}

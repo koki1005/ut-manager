@@ -44,7 +44,7 @@ export default function ProjectPage() {
             割り振り提案
           </div>
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-surface text-left text-muted">
+            <thead className="border-b border-border bg-header-tint text-left text-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">メンバー</th>
                 <th className="px-4 py-2 font-medium">総合</th>
