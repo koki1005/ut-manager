@@ -26,17 +26,26 @@ export default function MentorPage() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [live, setLive] = useState(false); // Geminiの実応答が来ているか
+  const [ctx, setCtx] = useState(DEMO_CONTEXT); // テストから引き継いだ提出（お題＋コード）
   const mockTurn = useRef(0);
 
-  // 開始の質問を Gemini から取得（キー未設定・失敗時はモックのまま）
+  // テストで書いたコードを引き継ぎ、開始の質問を Gemini から取得
   useEffect(() => {
     let aborted = false;
+    let context = DEMO_CONTEXT;
+    try {
+      const stored = sessionStorage.getItem("ut_submission");
+      if (stored) context = JSON.parse(stored);
+    } catch {
+      /* フォールバック：デモ文脈 */
+    }
+    setCtx(context);
     (async () => {
       try {
         const res = await fetch("/api/mentor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...DEMO_CONTEXT, history: [] }),
+          body: JSON.stringify({ ...context, history: [] }),
         });
         const data = await res.json();
         if (!aborted && data.reply) {
@@ -71,7 +80,7 @@ export default function MentorPage() {
       const res = await fetch("/api/mentor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...DEMO_CONTEXT, history }),
+        body: JSON.stringify({ ...ctx, history }),
       });
       const data = await res.json();
       const reply =

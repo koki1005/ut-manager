@@ -103,6 +103,19 @@ export default function MemberTestPage() {
           </button>
           <Link
             href="/member/mentor"
+            onClick={() => {
+              try {
+                sessionStorage.setItem(
+                  "ut_submission",
+                  JSON.stringify({
+                    task: `${DEMO_TASK.title}— ${DEMO_TASK.description}`,
+                    code,
+                  }),
+                );
+              } catch {
+                /* storage不可でもメンター側がフォールバックする */
+              }
+            }}
             className="bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:opacity-90"
           >
             提出してメンターへ →
