@@ -1,6 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-flash-latest";
+// 既定は安定して応答する Flash-Lite。混雑に強い。
+const PRIMARY = process.env.GEMINI_MODEL ?? "gemini-flash-lite-latest";
+// 上位モデルが混雑(503/429)したときの退避先。
+const FALLBACK = "gemini-flash-lite-latest";
+const MODELS = PRIMARY === FALLBACK ? [PRIMARY] : [PRIMARY, FALLBACK];
 
 /** APIキーが設定されているか（未設定ならモックにフォールバック） */
 export function geminiAvailable(): boolean {
@@ -15,12 +19,31 @@ function getClient(): GoogleGenAI {
   return client;
 }
 
-/** 単発のテキスト生成（generateContent）。まずはこれで接続する。 */
+function isRetriable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /"code":\s*(503|429)|UNAVAILABLE|RESOURCE_EXHAUSTED/.test(msg);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 単発のテキスト生成（generateContent）。
+ * 混雑(503/429)時は各モデルで軽くリトライし、上位が混んでいれば Lite へ退避する。
+ */
 export async function generateText(prompt: string): Promise<string> {
   const ai = getClient();
-  const res = await ai.models.generateContent({
-    model: MODEL,
-    contents: prompt,
-  });
-  return res.text ?? "";
+  let lastErr: unknown;
+  for (const model of MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await ai.models.generateContent({ model, contents: prompt });
+        return res.text ?? "";
+      } catch (e) {
+        lastErr = e;
+        if (!isRetriable(e)) throw e;
+        await sleep(400);
+      }
+    }
+  }
+  throw lastErr;
 }
