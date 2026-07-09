@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Topbar from "../../components/Topbar";
 
 type Msg = { role: "ai" | "me"; text: string };
@@ -13,11 +13,42 @@ const FOLLOWUPS = [
   "計算量とのトレードオフはどう考えた? 可読性を優先した場面は?",
 ];
 
+// 直近テストの文脈（本来は提出データを引き継ぐ。#20 で接続）
+const DEMO_CONTEXT = {
+  task: "時系列ログ配列から直近N分間のエラー率を返す関数 errorRate(logs, now, minutes) を実装せよ。",
+  code: "function errorRate(logs, now, minutes){ const from = now - minutes*60000; const recent = logs.filter(l => l.time >= from); if(recent.length === 0) return 0; return recent.filter(l => l.level === 'error').length / recent.length; }",
+};
+
 export default function MentorPage() {
   const [messages, setMessages] = useState<Msg[]>([{ role: "ai", text: OPENING }]);
   const [input, setInput] = useState("");
   const [turn, setTurn] = useState(0);
   const [done, setDone] = useState(false);
+  const [live, setLive] = useState(false); // Geminiの実応答が来たか
+
+  // 開始の質問を Gemini から取得（キー未設定・失敗時はモックのまま）
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/mentor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(DEMO_CONTEXT),
+        });
+        const data = await res.json();
+        if (!aborted && data.question) {
+          setMessages([{ role: "ai", text: data.question }]);
+          setLive(true);
+        }
+      } catch {
+        // フォールバック：モックのまま
+      }
+    })();
+    return () => {
+      aborted = true;
+    };
+  }, []);
 
   function send() {
     if (!input.trim()) return;
@@ -34,9 +65,17 @@ export default function MentorPage() {
       <Topbar title="AIメンター" switchHref="/manager" switchLabel="マネージャー画面へ" />
       <div className="mx-auto max-w-3xl p-6">
         <div className="mb-4 border-l-2 border-accent pl-3">
-          <h2 className="font-semibold">壁打ち・深掘り</h2>
+          <h2 className="flex items-center gap-2 font-semibold">
+            壁打ち・深掘り
+            {live && (
+              <span className="border border-accent px-1.5 py-0.5 text-[10px] font-normal text-accent">
+                Gemini接続中
+              </span>
+            )}
+          </h2>
           <p className="text-sm text-muted">
-            「なぜこうした?」を掘って理解の深さを測る。（生成は #20 で Gemini 接続）
+            「なぜこうした?」を掘って理解の深さを測る。
+            {live ? "" : "（キー未設定のためモック応答）"}
           </p>
         </div>
 
