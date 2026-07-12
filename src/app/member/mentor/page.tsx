@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Topbar from "../../components/Topbar";
 
 type Msg = { role: "ai" | "me"; text: string };
+type Score = {
+  understanding: number;
+  efficiency: number;
+  reliability: number;
+  comment: string;
+};
 
 const OPENING =
   "提出お疲れさま。なぜ配列を一度の走査で処理する形にした? 別の方法も考えた?";
@@ -27,6 +33,9 @@ export default function MentorPage() {
   const [done, setDone] = useState(false);
   const [live, setLive] = useState(false); // Geminiの実応答が来ているか
   const [ctx, setCtx] = useState(DEMO_CONTEXT); // テストから引き継いだ提出（お題＋コード）
+  const [scoring, setScoring] = useState(false); // 採点中
+  const [score, setScore] = useState<Score | null>(null);
+  const [scoreFallback, setScoreFallback] = useState(false); // 暫定値か
   const mockTurn = useRef(0);
 
   // テストで書いたコードを引き継ぎ、開始の質問を Gemini から取得
@@ -97,6 +106,39 @@ export default function MentorPage() {
     }
   }
 
+  // 壁打ちを終えて3軸スコアを算出。理解度・効率はメンバーに表示、
+  // 信頼性（自力度）＋講評はマネージャー用に sessionStorage へ渡す（評価一覧で利用予定）。
+  async function finish() {
+    if (scoring) return;
+    setDone(true);
+    setScoring(true);
+    try {
+      const res = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: ctx.task, code: ctx.code, history: messages }),
+      });
+      const data = await res.json();
+      const s: Score = {
+        understanding: data.understanding,
+        efficiency: data.efficiency,
+        reliability: data.reliability,
+        comment: data.comment,
+      };
+      setScore(s);
+      setScoreFallback(Boolean(data.fallback));
+      try {
+        sessionStorage.setItem("ut_score", JSON.stringify(s));
+      } catch {
+        /* 保存失敗は無視 */
+      }
+    } catch {
+      setScore(null);
+    } finally {
+      setScoring(false);
+    }
+  }
+
   return (
     <>
       <Topbar title="AIメンター" switchHref="/manager" switchLabel="マネージャー画面へ" />
@@ -162,8 +204,9 @@ export default function MentorPage() {
 
         <div className="mt-4 flex justify-end">
           <button
-            onClick={() => setDone(true)}
-            className="bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:opacity-90"
+            onClick={finish}
+            disabled={scoring}
+            className="bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:opacity-90 disabled:opacity-50"
           >
             壁打ちを終える
           </button>
@@ -174,19 +217,30 @@ export default function MentorPage() {
             <div className="border-b-2 border-accent px-4 py-2 text-sm font-semibold">
               あなたのスコア
             </div>
-            <div className="grid grid-cols-2 divide-x divide-border">
-              <div className="p-4">
-                <div className="text-xs text-muted">理解度</div>
-                <div className="font-mono text-2xl">72</div>
+            {scoring ? (
+              <div className="p-4 text-sm text-muted">採点中…</div>
+            ) : score ? (
+              <>
+                <div className="grid grid-cols-2 divide-x divide-border">
+                  <div className="p-4">
+                    <div className="text-xs text-muted">理解度</div>
+                    <div className="font-mono text-2xl">{score.understanding}</div>
+                  </div>
+                  <div className="p-4">
+                    <div className="text-xs text-muted">手を動かす効率</div>
+                    <div className="font-mono text-2xl">{score.efficiency}</div>
+                  </div>
+                </div>
+                <p className="border-t border-border px-4 py-2 text-xs text-muted">
+                  分析と信頼性（自力度）はマネージャーへ送信済み。
+                  {scoreFallback && "（キー未設定のため暫定値）"}
+                </p>
+              </>
+            ) : (
+              <div className="p-4 text-sm text-muted">
+                採点に失敗した。もう一度試して。
               </div>
-              <div className="p-4">
-                <div className="text-xs text-muted">手を動かす効率</div>
-                <div className="font-mono text-2xl">85</div>
-              </div>
-            </div>
-            <p className="border-t border-border px-4 py-2 text-xs text-muted">
-              分析と信頼性はマネージャーへ送信済み。（値はモック / 算出は #7・#21）
-            </p>
+            )}
           </div>
         )}
       </div>

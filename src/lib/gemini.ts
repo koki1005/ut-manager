@@ -47,3 +47,33 @@ export async function generateText(prompt: string): Promise<string> {
   }
   throw lastErr;
 }
+
+/**
+ * 構造化出力（JSON）。responseSchema で型を固定し、パースした値を返す。
+ * schema は @google/genai の Schema（type は "OBJECT"/"INTEGER"/"STRING" 等の文字列）。
+ * 混雑時のリトライ＆Lite退避は generateText と同じ。パース失敗は呼び出し側で握る。
+ */
+export async function generateJson<T>(
+  prompt: string,
+  schema: Record<string, unknown>,
+): Promise<T> {
+  const ai = getClient();
+  let lastErr: unknown;
+  for (const model of MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: { responseMimeType: "application/json", responseSchema: schema },
+        });
+        return JSON.parse(res.text ?? "") as T;
+      } catch (e) {
+        lastErr = e;
+        if (!isRetriable(e)) throw e;
+        await sleep(400);
+      }
+    }
+  }
+  throw lastErr;
+}
