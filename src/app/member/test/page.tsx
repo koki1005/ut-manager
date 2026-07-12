@@ -110,6 +110,7 @@ export default function MemberTestPage() {
                   JSON.stringify({
                     task: `${DEMO_TASK.title}— ${DEMO_TASK.description}`,
                     code,
+                    signals: { ...signals.current },
                   }),
                 );
               } catch {

@@ -2,14 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Topbar from "../../components/Topbar";
+import type { Score } from "@/lib/score";
 
 type Msg = { role: "ai" | "me"; text: string };
-type Score = {
-  understanding: number;
-  efficiency: number;
-  reliability: number;
-  comment: string;
-};
 
 const OPENING =
   "提出お疲れさま。なぜ配列を一度の走査で処理する形にした? 別の方法も考えた?";
@@ -20,10 +15,11 @@ const MOCK_FOLLOWUPS = [
   "その判断が崩れるとしたら、どんな入力のとき?",
 ];
 
-// 直近テストの文脈（本来は提出データを引き継ぐ。将来対応）
+// 直近テストの文脈（test画面から sessionStorage で引き継ぐ。無ければこのデモ値）
 const DEMO_CONTEXT = {
   task: "時系列ログ配列から直近N分間のエラー率を返す関数 errorRate(logs, now, minutes) を実装せよ。",
   code: "function errorRate(logs, now, minutes){ const from = now - minutes*60000; const recent = logs.filter(l => l.time >= from); if(recent.length === 0) return 0; return recent.filter(l => l.level === 'error').length / recent.length; }",
+  signals: { keystrokes: 0, pastes: 0, runs: 0 },
 };
 
 export default function MentorPage() {
@@ -116,7 +112,12 @@ export default function MentorPage() {
       const res = await fetch("/api/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task: ctx.task, code: ctx.code, history: messages }),
+        body: JSON.stringify({
+          task: ctx.task,
+          code: ctx.code,
+          signals: ctx.signals,
+          history: messages,
+        }),
       });
       const data = await res.json();
       const s: Score = {
