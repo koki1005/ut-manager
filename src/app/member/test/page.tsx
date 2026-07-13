@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Editor from "@monaco-editor/react";
 import Topbar from "../../components/Topbar";
 
@@ -18,11 +18,33 @@ function errorRate(logs, now, minutes) {
 };
 
 export default function MemberTestPage() {
+  const router = useRouter();
   const [code, setCode] = useState(DEMO_TASK.starter);
   const [output, setOutput] = useState("");
   const [dark, setDark] = useState(false);
-  // プロセスは裏で記録（テストモードでは非表示）。スコア算出は #7。
+  const [submitting, setSubmitting] = useState(false);
+  // プロセスは裏で記録（テストモードでは非表示）。
   const signals = useRef({ keystrokes: 0, pastes: 0, runs: 0 });
+
+  // 提出を Firestore に保存してからメンター画面へ。
+  async function submit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await fetch("/api/assessment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task: `${DEMO_TASK.title}— ${DEMO_TASK.description}`,
+          code,
+          signals: { ...signals.current },
+        }),
+      });
+    } catch {
+      /* 保存失敗でもメンター側がデモ文脈でフォールバックする */
+    }
+    router.push("/member/mentor");
+  }
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -101,26 +123,13 @@ export default function MemberTestPage() {
           >
             実行
           </button>
-          <Link
-            href="/member/mentor"
-            onClick={() => {
-              try {
-                sessionStorage.setItem(
-                  "ut_submission",
-                  JSON.stringify({
-                    task: `${DEMO_TASK.title}— ${DEMO_TASK.description}`,
-                    code,
-                    signals: { ...signals.current },
-                  }),
-                );
-              } catch {
-                /* storage不可でもメンター側がフォールバックする */
-              }
-            }}
-            className="bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:opacity-90"
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:opacity-90 disabled:opacity-50"
           >
-            提出してメンターへ →
-          </Link>
+            {submitting ? "提出中…" : "提出してメンターへ →"}
+          </button>
           <span className="text-sm text-muted">サンプル入力で errorRate を試します</span>
         </div>
 

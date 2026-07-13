@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Topbar from "../../components/Topbar";
-import { dreyfus, type Score } from "@/lib/score";
+import { dreyfus } from "@/lib/score";
 
 type RosterMember = {
   name: string;
@@ -26,24 +26,19 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(false);
   const [fallback, setFallback] = useState(false);
 
-  // 直近の実力調査結果を実測メンバーとして先頭に加える
+  // 採点済みの実測メンバー（Firestore）を先頭に、モックを土台として並べる
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("ut_score");
-      if (!stored) return;
-      const s = JSON.parse(stored) as Score;
-      setRoster([
-        {
-          name: "テスト受験者",
-          understanding: s.understanding,
-          efficiency: s.efficiency,
-          reliability: s.reliability,
-        },
-        ...MOCK_ROSTER,
-      ]);
-    } catch {
-      /* モックのまま */
-    }
+    (async () => {
+      try {
+        const r = await fetch("/api/roster");
+        if (!r.ok) return;
+        const d = await r.json();
+        const real: RosterMember[] = d.roster ?? [];
+        if (real.length) setRoster([...real, ...MOCK_ROSTER]);
+      } catch {
+        /* モックのまま */
+      }
+    })();
   }, []);
 
   async function assign() {
@@ -57,10 +52,16 @@ export default function ProjectPage() {
       });
       const data = await res.json();
       const list: Assignment[] = data.assignments ?? [];
+      const isFallback = Boolean(data.fallback);
       setAssignments(list);
-      setFallback(Boolean(data.fallback));
+      setFallback(isFallback);
+      // 割り当てを Firestore に保存（メンバーが自分の担当を読む）。
       try {
-        sessionStorage.setItem("ut_assignment", JSON.stringify(list));
+        await fetch("/api/assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project, items: list, fallback: isFallback }),
+        });
       } catch {
         /* 保存失敗は無視 */
       }

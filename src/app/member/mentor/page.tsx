@@ -15,7 +15,7 @@ const MOCK_FOLLOWUPS = [
   "その判断が崩れるとしたら、どんな入力のとき?",
 ];
 
-// 直近テストの文脈（test画面から sessionStorage で引き継ぐ。無ければこのデモ値）
+// 直近テストの文脈（test画面から Firestore 経由で引き継ぐ。無ければこのデモ値）
 const DEMO_CONTEXT = {
   task: "時系列ログ配列から直近N分間のエラー率を返す関数 errorRate(logs, now, minutes) を実装せよ。",
   code: "function errorRate(logs, now, minutes){ const from = now - minutes*60000; const recent = logs.filter(l => l.time >= from); if(recent.length === 0) return 0; return recent.filter(l => l.level === 'error').length / recent.length; }",
@@ -34,18 +34,22 @@ export default function MentorPage() {
   const [scoreFallback, setScoreFallback] = useState(false); // 暫定値か
   const mockTurn = useRef(0);
 
-  // テストで書いたコードを引き継ぎ、開始の質問を Gemini から取得
+  // テストで書いたコードを Firestore から引き継ぎ、開始の質問を Gemini から取得
   useEffect(() => {
     let aborted = false;
-    let context = DEMO_CONTEXT;
-    try {
-      const stored = sessionStorage.getItem("ut_submission");
-      if (stored) context = JSON.parse(stored);
-    } catch {
-      /* フォールバック：デモ文脈 */
-    }
-    setCtx(context);
     (async () => {
+      let context = DEMO_CONTEXT;
+      try {
+        const r = await fetch("/api/assessment");
+        if (r.ok) {
+          const d = await r.json();
+          if (d.submission) context = d.submission;
+        }
+      } catch {
+        /* フォールバック：デモ文脈 */
+      }
+      if (aborted) return;
+      setCtx(context);
       try {
         const res = await fetch("/api/mentor", {
           method: "POST",
@@ -103,7 +107,7 @@ export default function MentorPage() {
   }
 
   // 壁打ちを終えて3軸スコアを算出。理解度・効率はメンバーに表示、
-  // 信頼性（自力度）＋講評はマネージャー用に sessionStorage へ渡す（評価一覧で利用予定）。
+  // 信頼性（自力度）＋講評はマネージャー用に Firestore へ保存（評価一覧で参照）。
   async function finish() {
     if (scoring) return;
     setDone(true);
@@ -128,8 +132,13 @@ export default function MentorPage() {
       };
       setScore(s);
       setScoreFallback(Boolean(data.fallback));
+      // スコアを Firestore に保存（マネージャーの評価一覧・名簿から横断参照される）。
       try {
-        sessionStorage.setItem("ut_score", JSON.stringify(s));
+        await fetch("/api/assessment", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(s),
+        });
       } catch {
         /* 保存失敗は無視 */
       }

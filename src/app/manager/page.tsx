@@ -1,8 +1,6 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Topbar from "../components/Topbar";
-import { dreyfus, reliabilityNote, type Score } from "@/lib/score";
+import { dreyfus, reliabilityNote } from "@/lib/score";
+import { listScoredAssessments } from "@/lib/assessments";
 
 type Member = {
   name: string;
@@ -31,28 +29,18 @@ function Bar({ value }: { value: number }) {
   );
 }
 
-export default function ManagerEvaluationPage() {
-  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
-
-  // 直近の実力調査（メンバーの壁打ち結果）を読み、実測行を先頭に足す。
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("ut_score");
-      if (!stored) return;
-      const s = JSON.parse(stored) as Score;
-      const real: Member = {
-        name: "テスト受験者",
-        comprehension: s.understanding,
-        efficiency: s.efficiency,
-        trust: s.reliability,
-        comment: s.comment,
-        real: true,
-      };
-      setMembers([real, ...MOCK_MEMBERS]);
-    } catch {
-      /* 読めなければモックのまま */
-    }
-  }, []);
+export default async function ManagerEvaluationPage() {
+  // 採点済みの実測メンバーを全ユーザー分（Firestore）読み、モックの前に並べる。
+  const scored = await listScoredAssessments();
+  const real: Member[] = scored.map((a) => ({
+    name: a.displayName,
+    comprehension: a.score!.understanding,
+    efficiency: a.score!.efficiency,
+    trust: a.score!.reliability,
+    comment: a.score!.comment,
+    real: true,
+  }));
+  const members: Member[] = [...real, ...MOCK_MEMBERS];
 
   return (
     <>
@@ -61,7 +49,7 @@ export default function ManagerEvaluationPage() {
         <div className="mb-4 border-l-2 border-accent pl-3">
           <h2 className="font-semibold">評価一覧</h2>
           <p className="text-sm text-muted">
-            実力調査の結果。実測行は直近の壁打ちから算出（他はデモ）。
+            実力調査の結果。実測行はテスト→メンターの壁打ちから算出（他はデモ）。
           </p>
         </div>
 
@@ -78,11 +66,11 @@ export default function ManagerEvaluationPage() {
               </tr>
             </thead>
             <tbody>
-              {members.map((m) => {
+              {members.map((m, i) => {
                 const note = reliabilityNote(m.trust);
                 return (
                   <tr
-                    key={m.name}
+                    key={`${m.name}-${i}`}
                     className="border-b border-border last:border-b-0 hover:bg-surface"
                   >
                     <td className="px-4 py-3 font-medium">

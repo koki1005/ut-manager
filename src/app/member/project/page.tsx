@@ -10,17 +10,22 @@ export default function MemberProjectPage() {
   const [working, setWorking] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // マネージャーがAIに割り当てさせた結果から、自分（テスト受験者）の担当を読む
+  // マネージャーがAIに割り当てさせた結果（Firestore）から、自分の担当を読む
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("ut_assignment");
-      if (!stored) return;
-      const list = JSON.parse(stored) as Assignment[];
-      const me = list.find((a) => a.name === "テスト受験者") ?? list[0] ?? null;
-      setMine(me);
-    } catch {
-      /* 未割り当て */
-    }
+    (async () => {
+      try {
+        const r = await fetch("/api/assignment");
+        if (!r.ok) return;
+        const d = await r.json();
+        const list: Assignment[] = d.batch?.items ?? [];
+        if (!list.length) return;
+        const me =
+          (d.me && list.find((a) => a.name === d.me)) ?? list[0] ?? null;
+        setMine(me);
+      } catch {
+        /* 未割り当て */
+      }
+    })();
   }, []);
 
   return (

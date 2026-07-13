@@ -1,21 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export type NavItem = { href: string; label: string; soon?: boolean };
 
 export default function Sidebar({
   role,
   items,
+  userLabel,
 }: {
   role: string;
   items: NavItem[];
+  userLabel?: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function logout() {
+    await fetch("/api/auth/session", { method: "DELETE" });
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
-    <aside className="hidden w-60 shrink-0 bg-sidebar-bg text-sidebar-fg md:block">
+    <aside className="hidden w-60 shrink-0 flex-col bg-sidebar-bg text-sidebar-fg md:flex">
       <Link
         href="/"
         className="flex items-center gap-2 border-b border-white/15 px-4 py-3.5"
@@ -29,7 +38,7 @@ export default function Sidebar({
         </span>
       </Link>
 
-      <nav className="p-2">
+      <nav className="flex-1 p-2">
         {items.map((it) => {
           const active =
             pathname === it.href ||
@@ -60,6 +69,21 @@ export default function Sidebar({
           );
         })}
       </nav>
+
+      <div className="border-t border-white/15 p-3">
+        {userLabel && (
+          <p className="truncate px-1 pb-2 text-xs text-sidebar-fg/70">
+            {userLabel}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={logout}
+          className="w-full border border-white/25 px-3 py-2 text-left text-sm transition-colors hover:bg-white/10"
+        >
+          ログアウト
+        </button>
+      </div>
     </aside>
   );
 }
